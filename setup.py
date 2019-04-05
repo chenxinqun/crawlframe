@@ -67,7 +67,7 @@ args = dict(
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Software Development :: Libraries :: Application Frameworks',
         'Topic :: Software Development :: Libraries :: Python Modules',
-        'Framework :: crawlframe',
+        'Framework :: AsyncIO',
     ],
     name=about['__title__'],
     version=about['__version__'],
