@@ -1,6 +1,6 @@
 CrawlFrame: A Web Crawling framework
 ==========================
-
+[![PyPI](https://img.shields.io/pypi/v/crawlframe.svg)](https://pypi.org/project/crawlframe/)
 
 ##### Behold, the power of CrawlFrame:
 
@@ -19,7 +19,7 @@ crawlf stop <pid>
 Installation
 ------------
 
-To install CrawlFrame, simply use [pip](https://pypi.org/):
+To install CrawlFrame, simply use [pip](https://pypi.org/project/crawlframe/):
 
 ``` 
 $ pip install crawlframe
