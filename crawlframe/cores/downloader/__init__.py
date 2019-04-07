@@ -22,7 +22,7 @@ class MainDownloader:
     _sleep = configs.settings.TASKS_GET_INTERVAL
     _dividend = 1000
     _task_pools = pools.task_pools
-
+    _count = 0
     async def start_request(self):
         try:
             item = self._task_queues.task.get_nowait()
@@ -37,32 +37,21 @@ class MainDownloader:
             item = None
         return item
 
-    def count(self, func=None):
-        if hasattr(self, '_count'):
-            self._count += 1
-        else:
-            self._count = 0
-        gc.collect()
+    def count(self):
+        self._count += 1
 
     def task_len(self):
         return self._task_queues.task.qsize() + self._task_queues.next.qsize()
-
-    async def async_count(self, future=None):
-        if future is not None:
-            await future.result(timeout=self.timeout)
-            self.count()
-        gc.collect()
 
     async def call(self, obj):
         await self.loop.run_in_executor(None, obj)
         return self.count()
 
-    async def run(self, container=None):
+    async def run(self, spider=None):
         if hasattr(configs.settings, 'CRAWLFRAME_STOP_SIGNALS') and configs.settings.CRAWLFRAME_STOP_SIGNALS:
             return
         if self._sleep > self._dividend:
             self._sleep = self._dividend
-        self.count()
         _num = self._task_pools.maxsize
         task_list = []
         for i in range(_num):
@@ -71,15 +60,16 @@ class MainDownloader:
                 obj = await self.start_request()
             if callable(obj):
                 task_list.append(obj)
-                if not configs.settings.CRAWLFRAME_SYNC_TASKS:
-                    self.count()
+                self.count()
+                if spider is not None:
+                    spider.__count = self._count
         if configs.settings.CRAWLFRAME_SYNC_TASKS:
-            await self._task_pools.pool.apply_sync(task_list, callback=self.async_count)
+            await self._task_pools.pool.apply_sync(task_list)
         else:
             await self._task_pools.pool.map(task_list)
-        container.count = self._count
         if self.task_len() < 1:
             await sleep(self._sleep / self._dividend)
+        gc.collect()
 
 
 

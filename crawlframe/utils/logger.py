@@ -20,6 +20,11 @@ _log_title = lambda: '=== PID:%s ===>' % (os.getpid())
 # 日志模块
 class BaseLogger:
     _data = {}
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, 'instance'):
+            cls.instance = object.__new__(cls)
+        return cls.instance
+
     def __init__(self, log_name: str, log_file: str=None, log_path=None, log_level: str=None,
                  formatter: tuple or None=None, maxBytes: int= 50 * 1024 * 1024,
                  sh_off: bool=False, sh_level: str=None, file_extension=None):
@@ -137,7 +142,7 @@ class CrawlLogger(BaseLogger):
         _path = log_path or configs.settings.LOGGER_PATH
         formatter = configs.settings.SPIDER_LOGGER_FORMATTER
         _extension = file_extension or configs.settings.LOGGER_FILE_EXTENSION
-        super(CrawlLogger, self).__init__(
+        super().__init__(
             _log_name, log_path=_path, formatter=formatter, log_level=log_level.upper(),
             file_extension=_extension, **kwargs
         )
@@ -158,7 +163,7 @@ class SlowLogger(BaseLogger):
             log_file = None
             log_path = configs.settings.LOGGER_PATH
         _extension = configs.settings.LOGGER_FILE_EXTENSION or '.log'
-        super(SlowLogger, self).__init__(log_name=log_name, log_path=log_path, log_file=log_file, file_extension=_extension)
+        super().__init__(log_name=log_name, log_path=log_path, log_file=log_file, file_extension=_extension)
 
 
 def _get_slow_log(slow_type, request=None):

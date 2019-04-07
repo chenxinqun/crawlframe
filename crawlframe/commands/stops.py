@@ -29,6 +29,12 @@ from crawlframe.engine.crawl import input_checkout
 _sleep_tm = 1
 
 
+def write_stop(file):
+    with open(file, 'w', encoding='utf-8') as f:
+        f.write('true')
+        f.flush()
+
+
 def stop(args=None):
     if args is None:
         args = sys.argv[1:]
@@ -56,9 +62,8 @@ def stop(args=None):
     if args[0].isdigit() and isinstance(cache_files.get('stop'), list):
         for file in cache_files.get('stop'):
             if file.startswith(str(args[0])):
-                with open(file, 'w', encoding='utf-8') as f:
-                    f.write('true')
-                    f.flush()
+                write_stop(file)
+
     project_pid_list = []
     if isinstance(cache_files.get('data'), list):
         for file in cache_files.get('data'):
@@ -73,9 +78,8 @@ def stop(args=None):
                 pid_stop_dict[str(pid)] = False
                 app_stop_dict[app] = pid
                 if args[0] == app or args[0] == 'project':
-                    with open(os.path.join(cache_dir, '%s_stop' % pid), 'w', encoding='utf-8') as f:
-                        f.write('true')
-                        f.flush()
+                    write_stop(os.path.join(cache_dir, '%s_stop' % pid))
+
     app_stop = False
     if cache_files.values():
         if args[0].isdigit():

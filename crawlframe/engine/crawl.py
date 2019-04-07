@@ -6,17 +6,6 @@
 @Date  : 2019/1/19 12:20
 '''
 
-'''
-启动程序用
-支持工程级别的启动.
-要控制哪些APP不启动, 需要写在配置中.
-需要实现以下事情.
-由start脚本调用.接收参数(app:name, project:name).
-根据参数加载相应的配置, 生成配置对象.
-主进程是监护进程, 子进程才进行工作.
-子进程内部只用协程
-子进程用subprocess启动
-'''
 import warnings
 warnings.filterwarnings('ignore')
 import gc
@@ -24,12 +13,13 @@ import os
 import sys
 import traceback
 try:
+    import asyncio
     if 'win' not in sys.platform:
-        import asyncio
         import uvloop
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 except:
     pass
+
 from asyncio import (
     wait,
     sleep,
@@ -63,9 +53,9 @@ def input_checkout(args_in, input_type='start'):
             raise InputError(input_type)
 
 
-async def _logger_war(msg=None):
+def _logger_war(msg=None):
     if hasattr(logger, 'crawlframe_logger'):
-        await logger.crawlframe_logger.warning(msg)
+        return logger.crawlframe_logger.warning(msg)
 
 
 async def while_func(func, slp=1, args=None, loop=None):
@@ -133,43 +123,67 @@ async def while_func(func, slp=1, args=None, loop=None):
             await sleep(slp)
 
 
-async def guard(i, container, func):
-    try:
-        os.environ.pop(configs._SURVIVE_SIGNALS_ENV)
-    except:
-        pass
+async def guard(i, spider, download_run):
+    obj = download_run.__self__
+    count = getattr(spider, 'count', None) or obj._count
+    max_survive = getattr(configs.settings, configs._SURVIVE_SIGNALS_ENV)
     if configs.settings.CRAWLFRAME_SURVIVE_SWITCH:
-        if hasattr(configs.settings, configs._SURVIVE_SIGNALS_ENV) and isinstance(
-                getattr(configs.settings, configs._SURVIVE_SIGNALS_ENV), int):
+        if isinstance(max_survive, int) and count >= max_survive:
+            for i in range(spider.task_len()):
+                try:
+                    spider._task_queues.task.get_nowait()
+                except:
+                    pass
+                try:
+                    spider._task_queues.next.get_nowait()
+                except:
+                    pass
             # 执行一定请求数, 重启爬虫(可配置, 默认1000)
-            if container.count >= getattr(configs.settings, configs._SURVIVE_SIGNALS_ENV):
-                os.environ[configs._SURVIVE_SIGNALS_ENV] = 'true'
-                os.environ[configs._STOP_SIGNALS_ENV] = 'true'
-                configs.settings.CRAWLFRAME_STOP_SIGNALS = True
-                configs.settings.CRAWLFRAME_RELOAD_SIGNALS = True
-                return
-    return await func(container)
+            configs.settings.CRAWLFRAME_STOP_SIGNALS = True
+            obj._count = 0
+            spider.count = 0
+            return
+    return await download_run(spider)
 
 
 async def crawler(spider_run, i):
+    spider = spider_run.__self__
+    count = getattr(spider, 'count', None) or 0
+    max_survive = getattr(configs.settings, configs._SURVIVE_SIGNALS_ENV)
+    if configs.settings.CRAWLFRAME_SURVIVE_SWITCH:
+        if isinstance(max_survive, int) and count >= max_survive:
+            for i in range(spider.task_len()):
+                try:
+                    spider._task_queues.task.get_nowait()
+                except:
+                    pass
+                try:
+                    spider._task_queues.next.get_nowait()
+                except:
+                    pass
+            # 执行一定请求数, 重启爬虫(可配置, 默认1000)
+            configs.settings.CRAWLFRAME_STOP_SIGNALS = True
+            spider.count = 0
+            return
     return await spider_run()
 
 
-async def operation(app_name, loop=None):
+async def operation(app_name, loop=None, rel=False):
     # 获取settings模块
     settings_mod_name = os.getenv(configs._SETTINGS_ENV)
     if isinstance(settings_mod_name, str):
         settings_mod = import_module(settings_mod_name)
         settings = configs.get_settings(settings_mod)
         configs.settings = settings
+        reload(logger)
         crawlframe_logger = logger.CrawlLogger('crawlframe_logger', log_level='info')
         crawlframe_error = logger.CrawlLogger('crawlframe_error', log_level='error')
         logger.crawlframe_logger = crawlframe_logger
         logger.crawlframe_error = crawlframe_error
+        if rel:
+            _logger_war('CRAWLFRAME RELOAD')
         configs.settings.CRAWLFRAME_RELOAD_SIGNALS = False
         spiders_container = SpidersContainer()
-        if spiders_container.count > 0:
-            spiders_container.count = 0
         for spiders in settings.INSTALLED_SPIDER:
             if isinstance(spiders, dict):
                 for mod, sp in spiders.items():
@@ -201,7 +215,10 @@ async def operation(app_name, loop=None):
         from crawlframe.utils import middle
         reload(middle)
         middle.middleware = middle.get_middleware()
-        spider = spiders_container[app_name]()
+        app = spiders_container.get(app_name)
+        if not app:
+            raise NameError('The spider app: %s not found!' % app_name)
+        spider = app()
         middle.install_spider_middle(spider)
         download = MainDownloader()
         spider._task_queues = queues.task_queues
@@ -214,14 +231,23 @@ async def operation(app_name, loop=None):
             loop.create_task(while_func(crawler,args=(
                 spider.run, ), loop=loop)),
             loop.create_task(while_func(guard,args=(
-                spiders_container, download.run, ), loop=loop)),
+                spider, download.run, ), loop=loop)),
         ]
         if settings.SPIDER_RELOAD:
             task_list.append(loop.create_task(while_func(reload_module, slp=60)))
         await wait(task_list)
+        del spider
+        del download
+        del task_list
+        del middle.middleware
+        del pools.task_pools
+        del queues.task_queues
+        del spiders_container
+        gc.collect()
 
 
-def crawl_app(args=None):
+import time
+def crawl_app(args=None, rel=False):
     '''只启动APP'''
     if args is None:
         args = sys.argv[1:]
@@ -232,9 +258,28 @@ def crawl_app(args=None):
         os.environ[configs._CACHE_ENV] = os.path.join(chdir, 'cache')
     app_name = args[0].split(':')[1] if 'app:' in args[0] else None
     if app_name:
-        loop = get_event_loop()
-        loop.run_until_complete(loop.create_task(operation(app_name, loop)))
-
+        if 'win' in sys.platform:
+            loop = asyncio.ProactorEventLoop()
+            asyncio.set_event_loop(loop)
+        else:
+            loop = get_event_loop()
+        run = lambda: loop.run_until_complete(operation(app_name, loop, rel))
+        while 1:
+            reload_signals = os.environ.get('CRAWLFRAME_RELOAD_SIGNALS') or \
+                             getattr(configs.settings, 'CRAWLFRAME_RELOAD_SIGNALS', None)
+            stop_signals = os.environ.get(configs._STOP_SIGNALS_ENV) or ''
+            if isinstance(reload_signals, str) and reload_signals == 'stop':
+                break
+            if stop_signals == 'true':
+                break
+            configs.settings.CRAWLFRAME_STOP_SIGNALS = False
+            configs.settings.CRAWLFRAME_RELOAD_SIGNALS = False
+            run()
+            gc.collect()
+            time.sleep(1)
+        loop.close()
+        del loop
+    sys.exit()
 
 
 if __name__ == '__main__':

@@ -79,6 +79,8 @@ class HttpRequest(BaseRef):
             self.log = log
         elif isinstance(log, Logger):
             self.log = log
+        elif isinstance(log, object):
+            self.log = log
         else:
             raise TypeError('log must be string '
                             'or "crawlframe.utils.logger.BaseLogger" instance '

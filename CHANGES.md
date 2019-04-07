@@ -1,3 +1,18 @@
+crawlframe-1.0.2
+==========================
+```
+CRAWLFRAME_SURVIVE_SWITCH = True
+CRAWLFRAME_SURVIVE_MAX = int
+reload spider
+```
+CRAWLFRAME_SURVIVE_SWITCH = True
+CRAWLFRAME_SURVIVE_MAX = int
+设置两个参数
+发出一定请求数之后, 自动重启爬虫. 避免内存溢出.
+修复middle不能加载以及logger不能创建的bug.
+BaseLogger改为单例模式.
+
+
 crawlframe-1.0.1
 ==========================
 ``` 

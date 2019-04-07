@@ -51,6 +51,7 @@ def received_stop_signals(i, mod=None):
 
     if isinstance(signal, str) and signal == 'true':
         os.environ[configs._STOP_SIGNALS_ENV] = 'true'
+        os.environ['CRAWLFRAME_RELOAD_SIGNALS'] = 'stop'
         configs.settings.CRAWLFRAME_STOP_SIGNALS = True
         configs.settings.CRAWLFRAME_RELOAD_SIGNALS = 'stop'
         return

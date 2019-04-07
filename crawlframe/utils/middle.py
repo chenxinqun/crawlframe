@@ -35,6 +35,8 @@ def get_middleware():
                         instance = obj()
                         middle_mod = '.'.join(instance.__module__.split('.')[:-1])
                         middleware.spider.setdefault(middle_mod, [])
+                        middleware.request.setdefault(middle_mod, [])
+                        middleware.response.setdefault(middle_mod, [])
                         if callable(instance):
                             if isinstance(instance, SpiderMiddleware):
                                 middleware.spider[middle_mod].append(instance)

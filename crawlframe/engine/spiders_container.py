@@ -9,7 +9,6 @@ from collections import UserDict
 
 
 class SpidersContainer(UserDict):
-    count = 0
     def __missing__(self, key):
         if isinstance(key, str):
             raise KeyError(key)
