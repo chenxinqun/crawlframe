@@ -9,7 +9,7 @@
 
 __title__ = 'crawlframe'
 __url__ = 'https://github.com/chenxinqun/crawlframe'
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 __author__ = 'ChenXinqun'
 __author_email__ = 'chenxinqun163@163.com'
 __maintainer__ = '{} <{}>'.format(__author__, __author_email__)
