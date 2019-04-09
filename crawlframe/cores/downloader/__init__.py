@@ -8,6 +8,7 @@
 import gc
 from asyncio import events
 from asyncio import sleep
+from asyncio.locks import Lock
 from crawlframe import configs
 from crawlframe.utils import pools
 from crawlframe.utils import queues
@@ -23,6 +24,7 @@ class MainDownloader:
     _dividend = 1000
     _task_pools = pools.task_pools
     _count = 0
+    _lock = Lock()
     async def start_request(self):
         try:
             item = self._task_queues.task.get_nowait()
@@ -44,29 +46,23 @@ class MainDownloader:
         return self._task_queues.task.qsize() + self._task_queues.next.qsize()
 
     async def call(self, obj):
-        await self.loop.run_in_executor(None, obj)
+        await self._task_pools.pool.call(obj)
         return self.count()
 
-    async def run(self, spider=None):
+    async def run(self, spider=None, i=None):
         if hasattr(configs.settings, 'CRAWLFRAME_STOP_SIGNALS') and configs.settings.CRAWLFRAME_STOP_SIGNALS:
             return
         if self._sleep > self._dividend:
             self._sleep = self._dividend
         _num = self._task_pools.maxsize
         task_list = []
-        for i in range(_num):
-            obj = await self.next_request()
-            if not callable(obj):
-                obj = await self.start_request()
-            if callable(obj):
-                task_list.append(obj)
-                self.count()
-                if spider is not None:
-                    spider.__count = self._count
-        if configs.settings.CRAWLFRAME_SYNC_TASKS:
-            await self._task_pools.pool.apply_sync(task_list)
-        else:
-            await self._task_pools.pool.map(task_list)
+        obj = await self.next_request()
+        if not callable(obj):
+            obj = await self.start_request()
+        if callable(obj):
+            await self.call(obj)
+            spider.count = self._count
+            
         if self.task_len() < 1:
             await sleep(self._sleep / self._dividend)
         gc.collect()

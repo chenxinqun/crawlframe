@@ -109,6 +109,8 @@ async def while_func(func, slp=1, args=None, loop=None):
                 await func(i, *args)
             elif func.__name__ == 'crawler':
                 await func(*args, i)
+            elif msg_name.__name__ == 'MainDownloader':
+                await func(*args)
             else:
                 func()
         except Exception as e:
@@ -124,6 +126,7 @@ async def while_func(func, slp=1, args=None, loop=None):
 
 
 async def guard(i, spider, download_run):
+    loop = events.get_event_loop()
     obj = download_run.__self__
     count = getattr(spider, 'count', None) or obj._count
     max_survive = getattr(configs.settings, configs._SURVIVE_SIGNALS_ENV)
@@ -143,7 +146,9 @@ async def guard(i, spider, download_run):
             obj._count = 0
             spider.count = 0
             return
-    return await download_run(spider)
+    max_size = obj._task_pools.maxsize
+    downloads = [loop.create_task(while_func(download_run, args=(spider, i,))) for i in range(max_size)]
+    return await wait(downloads)
 
 
 async def crawler(spider_run, i):
@@ -231,7 +236,7 @@ async def operation(app_name, loop=None, rel=False):
             loop.create_task(while_func(crawler,args=(
                 spider.run, ), loop=loop)),
             loop.create_task(while_func(guard,args=(
-                spider, download.run, ), loop=loop)),
+                spider, download.run,), loop=loop)),
         ]
         if settings.SPIDER_RELOAD:
             task_list.append(loop.create_task(while_func(reload_module, slp=60)))
