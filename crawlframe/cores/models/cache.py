@@ -86,7 +86,7 @@ class BaseRedis:
         value = self.redis.hgetall(name)
         result_dict = {}
         if isinstance(value, dict):
-            for k, v in result_dict.items():
+            for k, v in value.items():
                 k = self.need_tytes(k, False)
                 v = self.need_tytes(v, need_bytes, encoding)
                 result_dict[k] = v
