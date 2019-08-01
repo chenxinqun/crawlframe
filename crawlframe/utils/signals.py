@@ -56,7 +56,8 @@ def received_stop_signals(i, mod=None):
         configs.settings.CRAWLFRAME_RELOAD_SIGNALS = 'stop'
         return
     else:
-        with open(signal_file, 'w', encoding='utf-8') as f:
-            f.write('%d:%d' % (i, time.time()))
-            f.flush()
+        if isinstance(signal_file, str) and signal_file:
+            with open(signal_file, 'w', encoding='utf-8') as f:
+                f.write('%d:%d' % (i, time.time()))
+                f.flush()
 
